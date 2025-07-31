@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>이미지 뷰어</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+        .upload-section {
+            flex: 1;
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        .viewer-section {
+            flex: 2;
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 5px;
+            text-align: center;
+            min-height: 400px;
+        }
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .image-item {
+            border: 2px solid #eee;
+            padding: 5px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+            position: relative;
+        }
+        .image-item:hover {
+            border-color: #0078d4;
+        }
+        .image-item.selected {
+            border-color: #0078d4;
+            background-color: #e1f0fa;
+        }
+        .image-item img {
+            width: 100%;
+            height: 100px;
+            object-fit: cover;
+        }
+        .delete-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background-color: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            display: none;
+        }
+        .image-item:hover .delete-btn {
+            display: block;
+        }
+        .delete-btn:hover {
+            background-color: #cc0000;
+        }
+        #mainImage {
+            max-width: 100%;
+            max-height: 400px;
+        }
+    </style>
+</head>
+<body>
+    <h1>📸 이미지 뷰어</h1>
+    
+    <div class="container">
+        <!-- 업로드 및 목록 섹션 -->
+        <div class="upload-section">
+            <h2>이미지 업로드</h2>
+            <form id="uploadForm">
+                <input type="file" id="imageInput" accept="image/*" required>
+                <button type="submit">업로드</button>
+            </form>
+            <div id="uploadResult"></div>
+            
+            <h3>이미지 목록</h3>
+            <button onclick="loadImages()">새로고침</button>
+            <div class="image-grid" id="imageGrid">
+                <p>이미지를 불러오는 중...</p>
+            </div>
+        </div>
+        
+        <!-- 뷰어 섹션 -->
+        <div class="viewer-section">
+            <h2>이미지 뷰어</h2>
+            <div id="viewer">
+                <p>이미지를 선택하세요</p>
+                <img id="mainImage" style="display: none;">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 이미지 업로드
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('imageInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('이미지를 선택해주세요!');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('image', file);
+            
+            try {
+                const response = await fetch('http://localhost:3000/upload/image', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('uploadResult').innerHTML = 
+                        '<p style="color: green;">업로드 성공!</p>';
+                    loadImages(); // 목록 새로고침
+                    fileInput.value = '';
+                } else {
+                    document.getElementById('uploadResult').innerHTML = 
+                        `<p style="color: red;">업로드 실패: ${result.error}</p>`;
+                }
+            } catch (error) {
+                console.error('업로드 에러 상세:', error);
+                document.getElementById('uploadResult').innerHTML = 
+                    `<p style="color: red;">업로드 중 오류: ${error.message || '서버에 연결할 수 없습니다'}</p>`;
+            }
+        });
+
+        // 이미지 목록 불러오기
+        async function loadImages() {
+            try {
+                const response = await fetch('http://localhost:3000/images');
+                const data = await response.json();
+                
+                const grid = document.getElementById('imageGrid');
+                
+                if (data.images.length === 0) {
+                    grid.innerHTML = '<p>업로드된 이미지가 없습니다.</p>';
+                    return;
+                }
+                
+                grid.innerHTML = '';
+                
+                data.images.forEach(image => {
+                    const div = document.createElement('div');
+                    div.className = 'image-item';
+                    div.onclick = (e) => {
+                        // 삭제 버튼 클릭 시 선택 방지
+                        if (e.target.classList.contains('delete-btn')) return;
+                        selectImage(image);
+                    };
+                    
+                    const img = document.createElement('img');
+                    img.src = `http://localhost:3000${image.url}`;
+                    img.alt = '썸네일';
+                    
+                    // 삭제 버튼 추가
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'delete-btn';
+                    deleteBtn.innerHTML = '×';
+                    deleteBtn.onclick = (e) => {
+                        e.stopPropagation(); // 부모 요소의 클릭 이벤트 전파 방지
+                        deleteImage(image.id);
+                    };
+                    
+                    div.appendChild(img);
+                    div.appendChild(deleteBtn);
+                    grid.appendChild(div);
+                });
+            } catch (error) {
+                console.error('목록 로드 에러 상세:', error);
+                document.getElementById('imageGrid').innerHTML = 
+                    `<p style="color: red;">이미지 목록 로드 실패: ${error.message || '서버에 연결할 수 없습니다'}</p>`;
+            }
+        }
+
+        // 이미지 선택 및 뷰어에 표시
+        function selectImage(image) {
+            // 이전에 선택된 이미지 스타일 제거
+            document.querySelectorAll('.image-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            // 현재 클릭한 이미지 스타일 적용
+            if (event && event.currentTarget) {
+                event.currentTarget.classList.add('selected');
+            }
+            
+            // 뷰어에 이미지 표시
+            const viewer = document.getElementById('viewer');
+            const mainImage = document.getElementById('mainImage');
+            
+            mainImage.src = `http://localhost:3000${image.url}`;
+            mainImage.style.display = 'block';
+            viewer.innerHTML = '';
+            viewer.appendChild(mainImage);
+        }
+
+        // 이미지 삭제
+        async function deleteImage(id) {
+            if (!confirm('정말 이 이미지를 삭제하시겠습니까?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`http://localhost:3000/images/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('이미지가 삭제되었습니다.');
+                    loadImages(); // 목록 새로고침
+                    
+                    // 뷰어에 현재 선택된 이미지가 삭제되었다면 초기화
+                    const mainImage = document.getElementById('mainImage');
+                    if (mainImage.src.includes(`/${id}`)) {
+                        document.getElementById('viewer').innerHTML = '<p>이미지를 선택하세요</p>';
+                        mainImage.style.display = 'none';
+                    }
+                } else {
+                    alert(`삭제 실패: ${result.message}`);
+                }
+            } catch (error) {
+                console.error('삭제 에러:', error);
+                alert('이미지 삭제 중 오류가 발생했습니다.');
+            }
+        }
+
+        // 페이지 로드 시 이미지 목록 표시
+        loadImages();
+    </script>
+</body>
+</html>
