@@ -40,6 +40,8 @@ export class UploadController {
     @UploadedFile() file: Express.Multer.File,
     @Res() res: Response,
   ) {
+    console.log('업로드된 파일:', file);
+    
     if (!file) {
       return res.status(400).json({ error: '파일이 없습니다.' });
     }

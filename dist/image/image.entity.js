@@ -10,22 +10,37 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Image = void 0;
-// src/image/image.entity.ts
 const typeorm_1 = require("typeorm");
 let Image = class Image {
 };
 __decorate([
-    (0, typeorm_1.PrimaryGeneratedColumn)({ type: 'integer' }),
+    (0, typeorm_1.PrimaryGeneratedColumn)(),
     __metadata("design:type", Number)
 ], Image.prototype, "id", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: 'text' }),
+    (0, typeorm_1.Column)(),
     __metadata("design:type", String)
 ], Image.prototype, "url", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: 'text', nullable: true }),
+    (0, typeorm_1.Column)(),
     __metadata("design:type", String)
-], Image.prototype, "caption", void 0);
+], Image.prototype, "filename", void 0);
+__decorate([
+    (0, typeorm_1.Column)(),
+    __metadata("design:type", String)
+], Image.prototype, "originalname", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'integer', default: 0 }),
+    __metadata("design:type", Number)
+], Image.prototype, "priority", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'integer', default: 0 }),
+    __metadata("design:type", Number)
+], Image.prototype, "zIndex", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' }),
+    __metadata("design:type", Date)
+], Image.prototype, "uploadedAt", void 0);
 Image = __decorate([
     (0, typeorm_1.Entity)()
 ], Image);

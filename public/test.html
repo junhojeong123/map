@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>이미지 뷰어</title>
+    <title>이미지 뷰어 - 파일 업로드</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -24,8 +24,65 @@
             border: 1px solid #ddd;
             padding: 20px;
             border-radius: 5px;
-            text-align: center;
             min-height: 400px;
+            position: relative;
+        }
+        .viewer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .viewer-content {
+            position: relative;
+            min-height: 300px;
+            border: 1px dashed #ccc;
+            padding: 10px;
+        }
+        .viewer-image-item {
+            position: absolute;
+            border: 2px solid #eee;
+            border-radius: 5px;
+            padding: 5px;
+            cursor: move;
+            transition: all 0.2s;
+        }
+        .viewer-image-item:hover {
+            border-color: #0078d4;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .viewer-image-item img {
+            width: 150px;
+            height: 150px;
+            object-fit: cover;
+        }
+        .viewer-delete-btn {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background-color: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .viewer-delete-btn:hover {
+            background-color: #cc0000;
+        }
+        .priority-badge {
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #0078d4;
+            color: white;
+            border-radius: 10px;
+            padding: 2px 8px;
+            font-size: 12px;
+            white-space: nowrap;
         }
         .image-grid {
             display: grid;
@@ -42,10 +99,6 @@
         }
         .image-item:hover {
             border-color: #0078d4;
-        }
-        .image-item.selected {
-            border-color: #0078d4;
-            background-color: #e1f0fa;
         }
         .image-item img {
             width: 100%;
@@ -64,31 +117,88 @@
             height: 20px;
             font-size: 12px;
             cursor: pointer;
-            display: none;
-        }
-        .image-item:hover .delete-btn {
-            display: block;
         }
         .delete-btn:hover {
             background-color: #cc0000;
         }
-        #mainImage {
-            max-width: 100%;
-            max-height: 400px;
+        .add-to-viewer-btn {
+            position: absolute;
+            bottom: 5px;
+            left: 5px;
+            background-color: #0078d4;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            padding: 2px 6px;
+            font-size: 10px;
+            cursor: pointer;
+        }
+        .add-to-viewer-btn:hover {
+            background-color: #005a9e;
+        }
+        .priority-controls {
+            margin-top: 10px;
+            display: flex;
+            gap: 5px;
+        }
+        .priority-btn {
+            background-color: #666;
+            color: white;
+            border: none;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .priority-btn:hover {
+            background-color: #333;
+        }
+        button {
+            background-color: #0078d4;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin: 5px 0;
+        }
+        button:hover {
+            background-color: #005a9e;
+        }
+        input[type="file"] {
+            margin: 10px 0;
+            padding: 5px;
+        }
+        .upload-progress {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .upload-progress-bar {
+            height: 100%;
+            background-color: #0078d4;
+            width: 0%;
+            transition: width 0.3s;
         }
     </style>
 </head>
 <body>
-    <h1>📸 이미지 뷰어</h1>
+    <h1>📸 이미지 뷰어 - 파일 업로드</h1>
     
     <div class="container">
-        <!-- 업로드 및 목록 섹션 -->
+        <!-- 파일 업로드 및 목록 섹션 -->
         <div class="upload-section">
-            <h2>이미지 업로드</h2>
-            <form id="uploadForm">
-                <input type="file" id="imageInput" accept="image/*" required>
-                <button type="submit">업로드</button>
+            <h2>이미지 파일 업로드</h2>
+            <form id="uploadForm" enctype="multipart/form-data">
+                <input type="file" id="imageInput" accept="image/*" multiple>
+                <button type="submit">이미지 업로드</button>
             </form>
+            <div class="upload-progress" id="uploadProgress" style="display: none;">
+                <div class="upload-progress-bar" id="progressBar"></div>
+            </div>
             <div id="uploadResult"></div>
             
             <h3>이미지 목록</h3>
@@ -100,51 +210,75 @@
         
         <!-- 뷰어 섹션 -->
         <div class="viewer-section">
-            <h2>이미지 뷰어</h2>
-            <div id="viewer">
-                <p>이미지를 선택하세요</p>
-                <img id="mainImage" style="display: none;">
+            <div class="viewer-header">
+                <h2>이미지 뷰어</h2>
+                <div>
+                    <button onclick="clearViewer()">뷰어 비우기</button>
+                    <button onclick="saveOrder()">순서 저장</button>
+                </div>
+            </div>
+            <div class="viewer-content" id="viewerContent">
+                <p>이미지를 선택하여 뷰어에 추가하세요</p>
             </div>
         </div>
     </div>
 
     <script>
-        // 이미지 업로드
+        // 뷰어에 추가된 이미지들 저장
+        let viewerImages = [];
+
+        // 파일 업로드
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const fileInput = document.getElementById('imageInput');
-            const file = fileInput.files[0];
+            const files = fileInput.files;
             
-            if (!file) {
-                alert('이미지를 선택해주세요!');
+            if (files.length === 0) {
+                alert('이미지 파일을 선택해주세요!');
                 return;
             }
             
-            const formData = new FormData();
-            formData.append('image', file);
+            // 업로드 진행 상황 표시
+            const progressDiv = document.getElementById('uploadProgress');
+            const progressBar = document.getElementById('progressBar');
+            progressDiv.style.display = 'block';
             
             try {
-                const response = await fetch('http://localhost:3000/upload/image', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok) {
-                    document.getElementById('uploadResult').innerHTML = 
-                        '<p style="color: green;">업로드 성공!</p>';
-                    loadImages(); // 목록 새로고침
-                    fileInput.value = '';
-                } else {
-                    document.getElementById('uploadResult').innerHTML = 
-                        `<p style="color: red;">업로드 실패: ${result.error}</p>`;
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    const formData = new FormData();
+                    formData.append('image', file);
+                    
+                    // 진행률 업데이트
+                    const progress = Math.round(((i + 1) / files.length) * 100);
+                    progressBar.style.width = `${progress}%`;
+                    
+                    const response = await fetch('http://localhost:3000/upload/image', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (!response.ok) {
+                        document.getElementById('uploadResult').innerHTML += 
+                            `<p style="color: red;">${file.name} 업로드 실패: ${result.error}</p>`;
+                    }
                 }
+                
+                // 업로드 완료
+                document.getElementById('uploadResult').innerHTML = 
+                    '<p style="color: green;">모든 이미지 업로드 완료!</p>';
+                fileInput.value = '';
+                progressDiv.style.display = 'none';
+                loadImages(); // 목록 새로고침
+                
             } catch (error) {
-                console.error('업로드 에러 상세:', error);
+                console.error('업로드 에러:', error);
                 document.getElementById('uploadResult').innerHTML = 
                     `<p style="color: red;">업로드 중 오류: ${error.message || '서버에 연결할 수 없습니다'}</p>`;
+                progressDiv.style.display = 'none';
             }
         });
 
@@ -166,56 +300,155 @@
                 data.images.forEach(image => {
                     const div = document.createElement('div');
                     div.className = 'image-item';
-                    div.onclick = (e) => {
-                        // 삭제 버튼 클릭 시 선택 방지
-                        if (e.target.classList.contains('delete-btn')) return;
-                        selectImage(image);
-                    };
+                    div.dataset.id = image.id;
+                    div.dataset.url = image.url;
+                    div.dataset.filename = image.filename;
                     
                     const img = document.createElement('img');
                     img.src = `http://localhost:3000${image.url}`;
-                    img.alt = '썸네일';
+                    img.alt = image.originalname;
+                    img.onerror = function() {
+                        this.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2NjYyIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgZm9udC1zaXplPSIxMiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzY2NiI+SW1hZ2U8L3RleHQ+PC9zdmc+';
+                        this.alt = '이미지 로드 실패';
+                    };
                     
                     // 삭제 버튼 추가
                     const deleteBtn = document.createElement('button');
                     deleteBtn.className = 'delete-btn';
                     deleteBtn.innerHTML = '×';
                     deleteBtn.onclick = (e) => {
-                        e.stopPropagation(); // 부모 요소의 클릭 이벤트 전파 방지
+                        e.stopPropagation();
                         deleteImage(image.id);
                     };
                     
+                    // 뷰어에 추가 버튼
+                    const addToViewerBtn = document.createElement('button');
+                    addToViewerBtn.className = 'add-to-viewer-btn';
+                    addToViewerBtn.innerHTML = '+';
+                    addToViewerBtn.title = '뷰어에 추가';
+                    addToViewerBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        addToViewer(image);
+                    };
+                    
+                    // 우선도 조절 버튼
+                    const priorityControls = document.createElement('div');
+                    priorityControls.className = 'priority-controls';
+                    
+                    const upBtn = document.createElement('button');
+                    upBtn.className = 'priority-btn';
+                    upBtn.innerHTML = '↑';
+                    upBtn.title = '우선도 올리기';
+                    upBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        updatePriority(image.id, Math.max(0, (image.priority || 0) - 1));
+                    };
+                    
+                    const downBtn = document.createElement('button');
+                    downBtn.className = 'priority-btn';
+                    downBtn.innerHTML = '↓';
+                    downBtn.title = '우선도 내리기';
+                    downBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        updatePriority(image.id, (image.priority || 0) + 1);
+                    };
+                    
+                    priorityControls.appendChild(upBtn);
+                    priorityControls.appendChild(downBtn);
+                    
                     div.appendChild(img);
                     div.appendChild(deleteBtn);
+                    div.appendChild(addToViewerBtn);
+                    div.appendChild(priorityControls);
                     grid.appendChild(div);
                 });
             } catch (error) {
-                console.error('목록 로드 에러 상세:', error);
+                console.error('목록 로드 에러:', error);
                 document.getElementById('imageGrid').innerHTML = 
                     `<p style="color: red;">이미지 목록 로드 실패: ${error.message || '서버에 연결할 수 없습니다'}</p>`;
             }
         }
 
-        // 이미지 선택 및 뷰어에 표시
-        function selectImage(image) {
-            // 이전에 선택된 이미지 스타일 제거
-            document.querySelectorAll('.image-item').forEach(item => {
-                item.classList.remove('selected');
-            });
-            
-            // 현재 클릭한 이미지 스타일 적용
-            if (event && event.currentTarget) {
-                event.currentTarget.classList.add('selected');
+        // 뷰어에 이미지 추가
+        function addToViewer(image) {
+            if (viewerImages.some(img => img.id === image.id)) {
+                alert('이 이미지는 이미 뷰어에 추가되어 있습니다.');
+                return;
             }
             
-            // 뷰어에 이미지 표시
-            const viewer = document.getElementById('viewer');
-            const mainImage = document.getElementById('mainImage');
+            viewerImages.push(image);
+            updateViewer();
+        }
+
+        // 뷰어 UI 업데이트 (우선도 기반 위치 설정)
+        function updateViewer() {
+            const viewerContent = document.getElementById('viewerContent');
             
-            mainImage.src = `http://localhost:3000${image.url}`;
-            mainImage.style.display = 'block';
-            viewer.innerHTML = '';
-            viewer.appendChild(mainImage);
+            if (viewerImages.length === 0) {
+                viewerContent.innerHTML = '<p>이미지를 선택하여 뷰어에 추가하세요</p>';
+                return;
+            }
+            
+            viewerContent.innerHTML = '';
+            
+            // 우선도 순서대로 정렬
+            const sortedImages = [...viewerImages].sort((a, b) => 
+                (a.priority || 0) - (b.priority || 0)
+            );
+            
+            sortedImages.forEach((image, index) => {
+                const div = document.createElement('div');
+                div.className = 'viewer-image-item';
+                div.dataset.viewerIndex = index;
+                div.dataset.imageId = image.id;
+                
+                // 우선도에 따라 위치 계산 (간단한 격자 배치)
+                const row = Math.floor(index / 3);
+                const col = index % 3;
+                div.style.left = `${col * 170 + 10}px`;
+                div.style.top = `${row * 170 + 10}px`;
+                div.style.zIndex = image.zIndex || image.priority || 0;
+                
+                const img = document.createElement('img');
+                img.src = `http://localhost:3000${image.url}`;
+                img.alt = image.originalname;
+                img.onerror = function() {
+                    this.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2NjYyIvPjx0ZXh0IHg9Ijc1IiB5PSI4MCIgZm9udC1zaXplPSIxNCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzY2NiI+SW1hZ2U8L3RleHQ+PC9zdmc+';
+                    this.alt = '이미지 로드 실패';
+                };
+                
+                // 삭제 버튼
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'viewer-delete-btn';
+                deleteBtn.innerHTML = '×';
+                deleteBtn.onclick = () => removeFromViewer(index);
+                
+                // 우선도 배지
+                const priorityBadge = document.createElement('div');
+                priorityBadge.className = 'priority-badge';
+                priorityBadge.innerHTML = `우선도: ${image.priority || 0}`;
+                
+                div.appendChild(img);
+                div.appendChild(deleteBtn);
+                div.appendChild(priorityBadge);
+                viewerContent.appendChild(div);
+            });
+        }
+
+        // 뷰어에서 이미지 제거
+        function removeFromViewer(index) {
+            viewerImages.splice(index, 1);
+            updateViewer();
+        }
+
+        // 뷰어 비우기
+        function clearViewer() {
+            if (viewerImages.length === 0) return;
+            
+            if (confirm('뷰어의 모든 이미지를 삭제하시겠습니까?')) {
+                viewerImages = [];
+                updateViewer();
+            }
         }
 
         // 이미지 삭제
@@ -233,20 +466,72 @@
                 
                 if (result.success) {
                     alert('이미지가 삭제되었습니다.');
-                    loadImages(); // 목록 새로고침
-                    
-                    // 뷰어에 현재 선택된 이미지가 삭제되었다면 초기화
-                    const mainImage = document.getElementById('mainImage');
-                    if (mainImage.src.includes(`/${id}`)) {
-                        document.getElementById('viewer').innerHTML = '<p>이미지를 선택하세요</p>';
-                        mainImage.style.display = 'none';
-                    }
+                    loadImages();
+                    viewerImages = viewerImages.filter(img => img.id !== id);
+                    updateViewer();
                 } else {
                     alert(`삭제 실패: ${result.message}`);
                 }
             } catch (error) {
                 console.error('삭제 에러:', error);
                 alert('이미지 삭제 중 오류가 발생했습니다.');
+            }
+        }
+
+        // 우선도 업데이트
+        async function updatePriority(id, priority) {
+            try {
+                const response = await fetch(`http://localhost:3000/images/${id}/priority`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ priority })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    loadImages(); // 목록 새로고침
+                    // 뷰어의 해당 이미지 우선도도 업데이트
+                    const imageIndex = viewerImages.findIndex(img => img.id === id);
+                    if (imageIndex !== -1) {
+                        viewerImages[imageIndex].priority = priority;
+                        updateViewer();
+                    }
+                } else {
+                    alert(`우선도 업데이트 실패: ${result.message}`);
+                }
+            } catch (error) {
+                console.error('우선도 업데이트 에러:', error);
+                alert('우선도 업데이트 중 오류가 발생했습니다.');
+            }
+        }
+
+        // 순서 저장 (드래그 앤 드롭 후)
+        async function saveOrder() {
+            const imageIds = viewerImages.map(img => img.id);
+            
+            try {
+                const response = await fetch('http://localhost:3000/images/reorder', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ imageIds })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('이미지 순서가 저장되었습니다.');
+                    loadImages(); // 목록 새로고침
+                } else {
+                    alert(`순서 저장 실패: ${result.message}`);
+                }
+            } catch (error) {
+                console.error('순서 저장 에러:', error);
+                alert('순서 저장 중 오류가 발생했습니다.');
             }
         }
 
