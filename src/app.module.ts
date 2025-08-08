@@ -1,9 +1,13 @@
-// src/app.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Image } from './image/image.entity';
-import { UploadController } from './upload/upload.controller';
+import { Token } from './token/token.entity';
+import { Map } from './map/map.entity';
 import { AppController } from './app.controller';
+import { UploadController } from './upload/upload.controller';
+import { TokenController } from './token/token.controller';
+import { MapController } from './map/map.controller';
+import { TokenGateway } from './token/token.gateway'; // 추가
 
 @Module({
   imports: [
@@ -14,13 +18,13 @@ import { AppController } from './app.controller';
       username: 'postgres',
       password: '1234',
       database: 'chat_app',
-      entities: [Image],  
+      entities: [Image, Token, Map],
       synchronize: true,
-      logging: false,
+      logging: true,
     }),
-    TypeOrmModule.forFeature([Image]),  
+    TypeOrmModule.forFeature([Image, Token, Map]),
   ],
-  controllers: [AppController, UploadController],
-  providers: [],  
+  controllers: [AppController, UploadController, TokenController, MapController],
+  providers: [TokenGateway], // 추가
 })
 export class AppModule {}
