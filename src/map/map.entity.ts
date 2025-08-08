@@ -16,10 +16,17 @@ export class Map {
   height: number;
 
   @Column({ type: 'text', nullable: true })
-  backgroundImage: string; // 배경 이미지 URL
+  backgroundImage: string;
+
+  // ✅ 방 ID 추가 (기존 세션 시스템과 연동)
+  @Column({ type: 'integer' })  // 또는 문자열 타입에 맞게 수정
+  roomId: number;  // 또는 sessionId, gameId 등 기존 필드명에 맞게
+
+  @Column({ type: 'boolean', default: false })
+  isActive: boolean;
 
   @Column({ type: 'jsonb', nullable: true })
-  properties: any; // 커스텀 속성
+  properties: any;
 
   @OneToMany(() => Token, token => token.map)
   tokens: Token[];

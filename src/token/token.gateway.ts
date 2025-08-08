@@ -4,6 +4,8 @@ import {
   SubscribeMessage,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  ConnectedSocket,
+  MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
@@ -17,7 +19,7 @@ export class TokenGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
-  private clients: Map<string, string> = new Map(); // clientId -> mapId
+  private clientSessions: Map<string, string> = new Map();
 
   handleConnection(client: Socket) {
     console.log(`클라이언트 연결됨: ${client.id}`);
@@ -25,46 +27,71 @@ export class TokenGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   handleDisconnect(client: Socket) {
     console.log(`클라이언트 연결 해제: ${client.id}`);
-    this.clients.delete(client.id);
+    this.clientSessions.delete(client.id);
   }
 
-  // 클라이언트가 맵에 입장
-  @SubscribeMessage('joinMap')
-  handleJoinMap(client: Socket, mapId: string) {
-    client.join(`map_${mapId}`);
-    this.clients.set(client.id, mapId);
-    console.log(`클라이언트 ${client.id}가 맵 ${mapId}에 입장`);
+  // ✅ 세션 입장
+  @SubscribeMessage('joinSession')
+  handleJoinSession(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { sessionId: string }  // 타입 명시
+  ) {
+    client.join(`session_${data.sessionId}`);
+    this.clientSessions.set(client.id, data.sessionId);
+    
+    client.emit('sessionJoined', { sessionId: data.sessionId });
   }
 
-  // 클라이언트가 맵에서 퇴장
-  @SubscribeMessage('leaveMap')
-  handleLeaveMap(client: Socket, mapId: string) {
-    client.leave(`map_${mapId}`);
-    this.clients.delete(client.id);
-    console.log(`클라이언트 ${client.id}가 맵 ${mapId}에서 퇴장`);
+  // 세션 퇴장
+  @SubscribeMessage('leaveSession')
+  handleLeaveSession(@ConnectedSocket() client: Socket) {
+    const sessionId = this.clientSessions.get(client.id);
+    if (sessionId) {
+      client.leave(`session_${sessionId}`);
+      this.clientSessions.delete(client.id);
+    }
   }
 
-  // ✅ 토큰 위치 변경 알림 (실시간 동기화)
-  @SubscribeMessage('tokenMoved')
-  handleTokenMoved(client: Socket, data: { mapId: number; token: any }) {
-    // 같은 맵에 있는 다른 클라이언트들에게 알림
-    this.server.to(`map_${data.mapId}`).emit('tokenUpdated', data.token);
+  // ✅ 맵 전환
+  @SubscribeMessage('switchMap')
+  handleSwitchMap(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { sessionId: string; mapId: number }  // 타입 명시
+  ) {
+    client.rooms.forEach(room => {
+      if (room.startsWith(`map_`)) {
+        client.leave(room);
+      }
+    });
+    
+    client.join(`map_${data.mapId}`);
+    client.emit('mapSwitched', { mapId: data.mapId });
   }
 
-  // 토큰 생성 알림
-  @SubscribeMessage('tokenCreated')
-  handleTokenCreated(client: Socket, data: { mapId: number; token: any }) {
-    this.server.to(`map_${data.mapId}`).emit('tokenAdded', data.token);
+  // ✅ 토큰 이동
+  @SubscribeMessage('moveToken')
+  handleMoveToken(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { sessionId: string; mapId: number; token: any }  // 타입 명시
+  ) {
+    client.to(`session_${data.sessionId}`).emit('tokenMoved', data);
   }
 
-  // 토큰 삭제 알림
-  @SubscribeMessage('tokenDeleted')
-  handleTokenDeleted(client: Socket, data: { mapId: number; tokenId: number }) {
-    this.server.to(`map_${data.mapId}`).emit('tokenRemoved', data.tokenId);
+  // 토큰 생성
+  @SubscribeMessage('createToken')
+  handleCreateToken(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { sessionId: string; mapId: number; token: any }  // 타입 명시
+  ) {
+    client.to(`session_${data.sessionId}`).emit('tokenCreated', data);
   }
 
-  // 맵 데이터 변경 알림
-  notifyMapUpdate(mapId: number, data: any) {
-    this.server.to(`map_${mapId}`).emit('mapUpdated', data);
+  // 토큰 삭제
+  @SubscribeMessage('deleteToken')
+  handleDeleteToken(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { sessionId: string; mapId: number; tokenId: number }  // 타입 명시
+  ) {
+    client.to(`session_${data.sessionId}`).emit('tokenDeleted', data);
   }
 }
